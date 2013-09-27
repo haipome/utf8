@@ -262,6 +262,18 @@ int isuchiness(ucs4_t uc)
     return 0;
 }
 
+/* 全角转半角 */
+ucs4_t ufull2half(ucs4_t uc)
+{
+    if (uc == 0x3000)
+        return ' ';
+
+    if (uc >= 0xff01 && uc <= 0xff5e)
+        return uc - 0xfee0;
+
+    return uc;
+}
+
 # ifdef TEST
 
 # include <stdio.h>

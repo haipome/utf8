@@ -28,3 +28,9 @@ int isuchiness(ucs4_t uc);
 
 ucs4_t ufull2half(ucs4_t uc);
 
+/* 日文平假名 */
+int ishiragana(ucs4_t uc);
+
+/* 日文片假名 */
+int iskatakana(ucs4_t uc);
+

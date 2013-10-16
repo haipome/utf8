@@ -274,27 +274,6 @@ ucs4_t ufull2half(ucs4_t uc)
     return uc;
 }
 
-/* 日文平假名 */
-int ishiragana(ucs4_t uc)
-{
-    if (uc >= 0x3040 && uc <= 0x309f)
-        return 1;
-
-    return 0;
-}
-
-/* 日文片假名 */
-int iskatakana(ucs4_t uc)
-{
-    if (uc >= 0x30a0 && uc <= 0x30ff)
-        return 1;
-
-    if (uc >= 0x31f0 && uc <= 0x31ff)
-        return 2;
-
-    return 0;
-}
-
 # ifdef TEST
 
 # include <stdio.h>

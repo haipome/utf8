@@ -9,7 +9,7 @@
 
 # include "utf8.h"
 
-int getu8c(char **src, ucs4_t *uc)
+ucs4_t getu8c(char **src, int *illegal)
 {
     static char umap[256] = { 0 };
     static int  umap_init_flag = 0;
@@ -54,76 +54,78 @@ int getu8c(char **src, ucs4_t *uc)
     }
 
     uint8_t *s = (uint8_t *)(*src);
-    int illegal = 0;
+    int _illegal = 0;
 
     while (umap[*s] == 0)
     {
         ++s;
-        ++illegal;
+        ++_illegal;
     }
 
-    int byte_num = umap[*s];
-    uint32_t _utf8_char = *s++ & (0xff >> byte_num);
-
+    uint8_t *_s;
+    int byte_num;
+    uint32_t uc;
     int i;
+
+repeat_label:
+    _s = s;
+    byte_num = umap[*s];
+    uc = *s++ & (0xff >> byte_num);
+
     for (i = 1; i < byte_num; ++i)
     {
-        if (*s == 0 || umap[*s])
+        if (umap[*s])
         {
-            *src = (char *)s;
-            *uc = 0;
-
-            return -1;
+            _illegal += s - _s;
+            goto repeat_label;
         }
         else
         {
-            _utf8_char = (_utf8_char << 6) + (*s & 0x3f);
+            uc = (uc << 6) + (*s & 0x3f);
             s += 1;
         }
     }
 
     *src = (char *)s;
-    *uc = _utf8_char;
+    if (illegal)
+        *illegal = _illegal;
 
-    return illegal;
+    return uc;
 }
 
-int u8decode(char *str, ucs4_t *des, size_t *n)
+size_t u8decode(char const *str, ucs4_t *des, size_t n, int *illegal)
 {
-    if (*n < 1)
+    if (n == 0)
         return 0;
 
-    char *s = str;
+    char *s = (char *)str;
     size_t i = 0;
-    int illegal = 0;
+    ucs4_t uc = 0;
+    int _illegal_all = 0, _illegal;
 
-    while (*s && (i < (*n - 1)))
+    while ((uc = getu8c(&s, &_illegal)))
     {
-        char *_s = s;
-        int ret = getu8c(&s, des + i);
-        
-        if (ret < 0)
+        if (i < (n - 1))
         {
-            illegal += s - _s;
+            des[i++] = uc;
+            _illegal_all += _illegal;
         }
         else
         {
-            illegal += ret;
-
-            ++i;
+            break;
         }
     }
 
     des[i] = 0;
-    *n = i;
+    if (illegal)
+        *illegal = _illegal_all + _illegal;
 
-    return illegal;
+    return i;
 }
 
-# define IF_LESS(n) do { \
-    size_t _n = (n); \
-    if (*left < (_n + 1)) return -2; \
-    *left -= _n; \
+# define IF_LESS(left, n) do { \
+    if ((size_t)(left) < (size_t)(n)) return -2; \
+    (left) -= (n); \
 } while (0)
 
 int putu8c(ucs4_t uc, char **des, size_t *left)
@@ -133,16 +135,16 @@ int putu8c(ucs4_t uc, char **des, size_t *left)
 
     if (uc < (0x1 << 7))
     {
-        IF_LESS(1);
+        IF_LESS(*left, 2);
 
         **des = (char)uc;
         *des += 1;
         **des = 0;
 
-        return 0;
+        return 1;
     }
 
-    int byte_num = 0;
+    int byte_num;
 
     if (uc < (0x1 << 11))
     {
@@ -160,16 +162,12 @@ int putu8c(ucs4_t uc, char **des, size_t *left)
     {
         byte_num = 5;
     }
-    else if (uc < (0x1 << 31))
+    else
     {
         byte_num = 6;
     }
-    else
-    {
-        return -3;
-    }
 
-    IF_LESS(byte_num);
+    IF_LESS(*left, byte_num + 1);
 
     int i;
     for (i = byte_num - 1; i > 0; --i)
@@ -183,37 +181,37 @@ int putu8c(ucs4_t uc, char **des, size_t *left)
     *des += byte_num;
     *(*des + byte_num) = 0;
 
-    return 0;
+    return byte_num;
 }
 
-int u8encode(ucs4_t *us, char *des, size_t *n)
+size_t u8encode(ucs4_t *us, char *des, size_t n, int *illegal)
 {
-    char *s = des;
-    size_t left = *n;
-    int illegal = 0;
+    if (n == 0)
+        return 0;
 
+    char *s = des;
+    size_t left = n;
+    size_t len = 0;
+    int _illegal = 0;
+
+    *s = 0;
     while (*us)
     {
         int ret = putu8c(*us, &s, &left);
-
-        if (ret == -2)
-        {
-            *s = 0;
-
-            return -1;
-        }
-        else if (ret < 0)
-        {
-            ++illegal;
-        }
+        if (ret > 0)
+            len += ret;
+        else if (ret == -1)
+            _illegal += 1;
+        else
+            return len;
         
         ++us;
     }
 
-    *s = 0;
-    *n = *n - left;
+    if (illegal)
+        *illegal = _illegal;
 
-    return illegal;
+    return len;
 }
 
 /* 中日韩越统一表意文字 */
@@ -274,6 +272,27 @@ ucs4_t ufull2half(ucs4_t uc)
     return uc;
 }
 
+/* 日文平假名 */
+int ishiragana(ucs4_t uc)
+{
+    if (uc >= 0x3040 && uc <= 0x309f)
+        return 1;
+
+    return 0;
+}
+
+/* 日文片假名 */
+int iskatakana(ucs4_t uc)
+{
+    if (uc >= 0x30a0 && uc <= 0x30ff)
+        return 1;
+
+    if (uc >= 0x31f0 && uc <= 0x31ff)
+        return 2;
+
+    return 0;
+}
+
 # ifdef TEST
 
 # include <stdio.h>
@@ -291,22 +310,23 @@ int main()
         line[strlen(line) - 1] = 0;
 
         size_t len = strlen(line) + 1;
-        ucs4_t *us = malloc(len * sizeof(ucs4_t));
+        printf("len = %zu\n", len);
 
-        u8decode(line, us, &len);
+        ucs4_t *us = calloc(len, sizeof(ucs4_t));
+        int illegal = 0;
 
-        printf("len: %zu\n", len);
+        size_t n = u8decode(line, us, len, &illegal);
+        printf("len: %zu, illegal: %d\n", n, illegal);
         
         int i;
-        for (i = 0; i < len; ++i)
+        for (i = 0; i < n; ++i)
             printf("%#010x\n", us[i]);
 
         len = len * 6 + 1;
-        char *cs = malloc(len);
+        char *cs = calloc(len, 1);
 
-        u8encode(us, cs, &len);
-
-        printf("len: %zu\n", len);
+        n = u8encode(us, cs, len, &illegal);
+        printf("len: %zu, illegal: %d\n", n, illegal);
         puts(cs);
 
         free(us);

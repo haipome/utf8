@@ -123,9 +123,10 @@ size_t u8decode(char const *str, ucs4_t *des, size_t n, int *illegal)
     return i;
 }
 
-# define IF_LESS(left, n) do { \
-    if ((size_t)(left) < (size_t)(n)) return -2; \
-    (left) -= (n); \
+# define IF_CAN_HOLD(left, n) do { \
+    size_t _n = (size_t)(n); \
+    if ((size_t)(left) < (_n + 1)) return -2; \
+    (left) -= _n; \
 } while (0)
 
 int putu8c(ucs4_t uc, char **des, size_t *left)
@@ -135,7 +136,7 @@ int putu8c(ucs4_t uc, char **des, size_t *left)
 
     if (uc < (0x1 << 7))
     {
-        IF_LESS(*left, 2);
+        IF_CAN_HOLD(*left, 1);
 
         **des = (char)uc;
         *des += 1;
@@ -167,7 +168,7 @@ int putu8c(ucs4_t uc, char **des, size_t *left)
         byte_num = 6;
     }
 
-    IF_LESS(*left, byte_num + 1);
+    IF_CAN_HOLD(*left, byte_num);
 
     int i;
     for (i = byte_num - 1; i > 0; --i)
@@ -309,9 +310,9 @@ int main()
     {
         line[strlen(line) - 1] = 0;
 
-        size_t len = strlen(line) + 1;
-        printf("len = %zu\n", len);
+        printf("len = %zu\n", strlen(line));
 
+        size_t len = strlen(line) + 1;
         ucs4_t *us = calloc(len, sizeof(ucs4_t));
         int illegal = 0;
 

@@ -225,30 +225,32 @@ size_t u8encode(ucs4_t *us, char *des, size_t n, int *illegal)
 int main()
 {
     char *line = NULL;
-    size_t len = 0;
+    size_t buf_size = 0;
 
-    while (getline(&line, &len, stdin) != -1)
+    while (getline(&line, &buf_size, stdin) != -1)
     {
-        line[strlen(line) - 1] = 0;
+        size_t len = strlen(line);
+        if (line[len - 1] == '\n')
+            line[--len] = 0;
+        printf("len = %zu\n", len);
 
-        printf("len = %zu\n", strlen(line));
+        size_t n;
+        int illegal;
 
-        size_t len = strlen(line) + 1;
+        len = len + 1;
         ucs4_t *us = calloc(len, sizeof(ucs4_t));
-        int illegal = 0;
-
-        size_t n = u8decode(line, us, len, &illegal);
-        printf("len: %zu, illegal: %d\n", n, illegal);
+        n = u8decode(line, us, len, &illegal);
+        printf("n: %zu, illegal: %d\n", n, illegal);
         
         int i;
         for (i = 0; i < n; ++i)
             printf("%#010x\n", us[i]);
 
-        len = len * 6 + 1;
+        len = n * 6 + 1;
         char *cs = calloc(len, 1);
-
         n = u8encode(us, cs, len, &illegal);
         printf("len: %zu, illegal: %d\n", n, illegal);
+
         puts(cs);
 
         free(us);

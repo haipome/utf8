@@ -1,6 +1,6 @@
 /*
  * Description: 
- *     History: damonyang@tencent.com, 2013/05/29, create
+ *     History: yang@haipo.me, 2013/05/29, create
  */
 
 
@@ -213,85 +213,6 @@ size_t u8encode(ucs4_t *us, char *des, size_t n, int *illegal)
         *illegal = _illegal;
 
     return len;
-}
-
-/* 中日韩越统一表意文字 */
-int isuchiness(ucs4_t uc)
-{
-    /* 最初期统一汉字 */
-    if (uc >= 0x4e00 && uc <= 0x9fcc)
-        return 1;
-
-    /* 扩展 A 区 */
-    if (uc >= 0x3400 && uc <= 0x4db5)
-        return 2;
-
-    /* 扩展 B 区 */
-    if (uc >= 0x20000 && uc <= 0x2a6d6)
-        return 3;
-
-    /* 扩展 C 区 */
-    if (uc >= 0x2a700 && uc <= 0x2b734)
-        return 4;
-
-    /* 扩展 D 区 */
-    if (uc >= 0x2b740 && uc <= 0x2b81f)
-        return 5;
-
-    /* 扩展 E 区 */
-    if (uc >= 0x2b820 && uc <= 0x2f7ff)
-        return 6;
-
-    /* 台湾兼容汉字 */
-    if (uc >= 0x2f800 && uc <= 0x2fa1d)
-        return 7;
-
-    /* 北朝鲜兼容汉字 */
-    if (uc >= 0xfa70 && uc <= 0xfad9)
-        return 8;
-
-    /* 兼容汉字 */
-    if (uc >= 0xf900 && uc <= 0xfa2d)
-        return 9;
-
-    /* 兼容汉字 */
-    if (uc >= 0xfa30 && uc <= 0xfa6d)
-        return 10;
-
-    return 0;
-}
-
-/* 全角转半角 */
-ucs4_t ufull2half(ucs4_t uc)
-{
-    if (uc == 0x3000)
-        return ' ';
-
-    if (uc >= 0xff01 && uc <= 0xff5e)
-        return uc - 0xfee0;
-
-    return uc;
-}
-
-/* 日文平假名 */
-int ishiragana(ucs4_t uc)
-{
-    if (uc >= 0x3040 && uc <= 0x309f)
-        return 1;
-
-    return 0;
-}
-
-/* 日文片假名 */
-int iskatakana(ucs4_t uc)
-{
-    if (uc >= 0x30a0 && uc <= 0x30ff)
-        return 1;
-
-    if (uc >= 0x31f0 && uc <= 0x31ff)
-        return 2;
-
-    return 0;
 }
 
 # ifdef TEST

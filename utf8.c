@@ -1,6 +1,6 @@
 /*
  * Description: 
- *     History: yang@haipo.me, 2013/05/29, create
+ *     History: damonyang@tencent.com, 2013/05/29, create
  */
 
 
@@ -54,21 +54,21 @@ ucs4_t getu8c(char **src, int *illegal)
     }
 
     uint8_t *s = (uint8_t *)(*src);
-    int _illegal = 0;
+    int r_illegal = 0;
 
     while (umap[*s] == 0)
     {
         ++s;
-        ++_illegal;
+        ++r_illegal;
     }
 
-    uint8_t *_s;
+    uint8_t *t;
     int byte_num;
     uint32_t uc;
     int i;
 
 repeat_label:
-    _s = s;
+    t = s;
     byte_num = umap[*s];
     uc = *s++ & (0xff >> byte_num);
 
@@ -76,7 +76,7 @@ repeat_label:
     {
         if (umap[*s])
         {
-            _illegal += s - _s;
+            r_illegal += s - t;
             goto repeat_label;
         }
         else
@@ -88,7 +88,9 @@ repeat_label:
 
     *src = (char *)s;
     if (illegal)
-        *illegal = _illegal;
+    {
+        *illegal = r_illegal;
+    }
 
     return uc;
 }
@@ -101,14 +103,14 @@ size_t u8decode(char const *str, ucs4_t *des, size_t n, int *illegal)
     char *s = (char *)str;
     size_t i = 0;
     ucs4_t uc = 0;
-    int _illegal_all = 0, _illegal;
+    int r_illegal_all = 0, r_illegal;
 
-    while ((uc = getu8c(&s, &_illegal)))
+    while ((uc = getu8c(&s, &r_illegal)))
     {
         if (i < (n - 1))
         {
             des[i++] = uc;
-            _illegal_all += _illegal;
+            r_illegal_all += r_illegal;
         }
         else
         {
@@ -118,15 +120,17 @@ size_t u8decode(char const *str, ucs4_t *des, size_t n, int *illegal)
 
     des[i] = 0;
     if (illegal)
-        *illegal = _illegal_all + _illegal;
+    {
+        *illegal = r_illegal_all + r_illegal;
+    }
 
     return i;
 }
 
 # define IF_CAN_HOLD(left, n) do { \
-    size_t _n = (size_t)(n); \
-    if ((size_t)(left) < (_n + 1)) return -2; \
-    (left) -= _n; \
+    size_t m = (size_t)(n); \
+    if ((size_t)(left) < (m + 1)) return -2; \
+    (left) -= m; \
 } while (0)
 
 int putu8c(ucs4_t uc, char **des, size_t *left)
@@ -180,7 +184,7 @@ int putu8c(ucs4_t uc, char **des, size_t *left)
     *(uint8_t *)(*des) = uc | (0xff << (8 - byte_num));
 
     *des += byte_num;
-    *(*des + byte_num) = 0;
+    **des = 0;
 
     return byte_num;
 }
@@ -193,72 +197,211 @@ size_t u8encode(ucs4_t *us, char *des, size_t n, int *illegal)
     char *s = des;
     size_t left = n;
     size_t len = 0;
-    int _illegal = 0;
+    int r_illegal = 0;
 
     *s = 0;
     while (*us)
     {
         int ret = putu8c(*us, &s, &left);
         if (ret > 0)
+        {
             len += ret;
+        }
         else if (ret == -1)
-            _illegal += 1;
+        {
+            r_illegal += 1;
+        }
         else
-            return len;
+        {
+            break;
+        }
         
         ++us;
     }
 
     if (illegal)
-        *illegal = _illegal;
+    {
+        *illegal = r_illegal;
+    }
 
     return len;
 }
 
-# ifdef TEST
-
-# include <stdio.h>
-# include <stdlib.h>
-# include <string.h>
-# include <error.h>
-
-int main()
+/* 全角字符 */
+int isufullwidth(ucs4_t uc)
 {
-    char *line = NULL;
-    size_t buf_size = 0;
+    if (uc == 0x3000)
+        return 1;
 
-    while (getline(&line, &buf_size, stdin) != -1)
-    {
-        size_t len = strlen(line);
-        if (line[len - 1] == '\n')
-            line[--len] = 0;
-        printf("len = %zu\n", len);
-
-        size_t n;
-        int illegal;
-
-        len = len + 1;
-        ucs4_t *us = calloc(len, sizeof(ucs4_t));
-        n = u8decode(line, us, len, &illegal);
-        printf("n: %zu, illegal: %d\n", n, illegal);
-        
-        int i;
-        for (i = 0; i < n; ++i)
-            printf("%#010x\n", us[i]);
-
-        len = n * 6 + 1;
-        char *cs = calloc(len, 1);
-        n = u8encode(us, cs, len, &illegal);
-        printf("len: %zu, illegal: %d\n", n, illegal);
-
-        puts(cs);
-
-        free(us);
-        free(cs);
-    }
+    if (uc >= 0xff01 && uc <= 0xff5e)
+        return 1;
 
     return 0;
 }
 
-# endif
+/* 全角字母 */
+int isufullwidthalpha(ucs4_t uc)
+{
+    if (uc >= 0xff21 && uc <= 0xff3a)
+        return 1;
+
+    if (uc >= 0xff41 && uc <= 0xff5a)
+        return 2;
+
+    return 0;
+}
+
+/* 全角数字  */
+int isufullwidthdigit(ucs4_t uc)
+{
+    if (uc >= 0xff10 && uc <= 0xff19)
+        return 1;
+
+    return 0;
+}
+
+/* 全角转半角 */
+ucs4_t ufull2half(ucs4_t uc)
+{
+    if (uc == 0x3000)
+        return ' ';
+
+    if (uc >= 0xff01 && uc <= 0xff5e)
+        return uc - 0xfee0;
+
+    return uc;
+}
+
+/* 半角转全角 */
+ucs4_t uhalf2full(ucs4_t uc)
+{
+    if (uc == ' ')
+        return 0x3000;
+
+    if (uc >= 0x21 && uc <= 0x7e)
+        return uc + 0xfee0;
+
+    return uc;
+}
+
+/* 中日韩越统一表意文字 */
+int isuchiness(ucs4_t uc)
+{
+    /* 最初期统一汉字 */
+    if (uc >= 0x4e00 && uc <= 0x9fcc)
+        return 1;
+
+    /* 扩展 A 区 */
+    if (uc >= 0x3400 && uc <= 0x4db5)
+        return 2;
+
+    /* 扩展 B 区 */
+    if (uc >= 0x20000 && uc <= 0x2a6d6)
+        return 3;
+
+    /* 扩展 C 区 */
+    if (uc >= 0x2a700 && uc <= 0x2b734)
+        return 4;
+
+    /* 扩展 D 区 */
+    if (uc >= 0x2b740 && uc <= 0x2b81f)
+        return 5;
+
+    /* 扩展 E 区 */
+    if (uc >= 0x2b820 && uc <= 0x2f7ff)
+        return 6;
+
+    /* 台湾兼容汉字 */
+    if (uc >= 0x2f800 && uc <= 0x2fa1d)
+        return 7;
+
+    /* 北朝鲜兼容汉字 */
+    if (uc >= 0xfa70 && uc <= 0xfad9)
+        return 8;
+
+    /* 兼容汉字 */
+    if (uc >= 0xf900 && uc <= 0xfa2d)
+        return 9;
+
+    /* 兼容汉字 */
+    if (uc >= 0xfa30 && uc <= 0xfa6d)
+        return 10;
+
+    return 0;
+}
+
+/* 中文标点 */
+int isuzhpunct(ucs4_t uc)
+{
+    if (uc >= 0x3001 && uc <= 0x3002)
+        return 1;
+
+    if (uc >= 0x3008 && uc <= 0x300f)
+        return 1;
+
+    if (uc >= 0xff01 && uc <= 0xff0f)
+        return 1;
+
+    if (uc >= 0xff1a && uc <= 0xff20)
+        return 1;
+
+    if (uc >= 0xff3b && uc <= 0xff40)
+        return 1;
+
+    if (uc >= 0xff5b && uc <= 0xff5e)
+        return 1;
+
+    if (uc >= 0x2012 && uc <= 0x201f)
+        return 1;
+
+    if (uc >= 0xfe41 && uc <= 0xfe44)
+        return 1;
+
+    if (uc >= 0xfe49 && uc <= 0xfe4f)
+        return 1;
+
+    if (uc >= 0x3010 && uc <= 0x3017)
+        return 1;
+
+    return 0;
+}
+
+/* 日文平假名 */
+int isuhiragana(ucs4_t uc)
+{
+    if (uc >= 0x3040 && uc <= 0x309f)
+        return 1;
+
+    return 0;
+}
+
+/* 日文片假名 */
+int isukatakana(ucs4_t uc)
+{
+    if (uc >= 0x30a0 && uc <= 0x30ff)
+        return 1;
+
+    if (uc >= 0x31f0 && uc <= 0x31ff)
+        return 2;
+
+    return 0;
+}
+
+/* 韩文 */
+int isukorean(ucs4_t uc)
+{
+    /* 韩文拼音 */
+    if (uc >= 0xac00 && uc <= 0xd7af)
+        return 1;
+
+    /* 韩文字母 */
+    if (uc >= 0x1100 && uc <= 0x11ff)
+        return 2;
+
+    /* 韩文兼容字母 */
+    if (uc >= 0x3130 && uc <= 0x318f)
+        return 3;
+
+    return 0;
+}
 

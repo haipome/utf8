@@ -1,6 +1,7 @@
 /*
- * Description: 
- *     History: damonyang@tencent.com, 2013/05/29, create
+ * Description: UTF-8 字符串的解码和编码函数
+ *              unicode 字符处理函数
+ *     History: yang@haipo.me, 2013/05/29, create
  */
 
 

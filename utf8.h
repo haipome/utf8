@@ -2,6 +2,10 @@
  * Description: UTF-8 字符串的解码和编码函数
  *              unicode 字符处理函数
  *     History: yang@haipo.me, 2013/05/29, create
+ *
+ * This code is in the public domain. 
+ * You may use this code any way you wish, private, educational,
+ * or commercial. It's free.
  */
 
 # pragma once

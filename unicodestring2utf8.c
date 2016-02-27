@@ -24,7 +24,6 @@ char *parse(const char *input)
         if (input_size - inpos >= 6 && input[inpos] == '\\' && input[inpos + 1] == 'u' && isxdigit(input[inpos + 2]) && \
                 isxdigit(input[inpos + 3]) && isxdigit(input[inpos + 4]) && isxdigit(input[inpos + 5])) {
             ucs4_t uc = (hex2int(input[inpos + 2]) << 12) + (hex2int(input[inpos + 3]) << 8) + (hex2int(input[inpos + 4]) << 4) + (hex2int(input[inpos + 5]));
-            printf("ox%x\n", uc);
             ucs4_t us[2];
             us[0] = uc;
             us[1] = 0;
